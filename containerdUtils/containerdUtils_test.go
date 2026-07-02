@@ -154,6 +154,157 @@ version = 3
 	}
 }
 
+func TestGetGRPCAddress_returnsConfiguredAddress(t *testing.T) {
+	// Given
+	configPath := writeContainerdConfig(t, `
+version = 3
+
+[grpc]
+  address = "/run/k3s/containerd/containerd.sock"
+`)
+	withConfigPath(t, []string{configPath})
+
+	// When
+	address, err := GetGRPCAddress()
+
+	// Then
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+	if address != "/run/k3s/containerd/containerd.sock" {
+		t.Fatalf("Expected configured grpc address, got: %s", address)
+	}
+}
+
+func TestGetGRPCAddress_returnsDefaultAddress_whenConfigOmitsAddress(t *testing.T) {
+	// Given
+	configPath := writeContainerdConfig(t, `
+version = 3
+`)
+	withConfigPath(t, []string{configPath})
+
+	// When
+	address, err := GetGRPCAddress()
+
+	// Then
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+	if address != defaultGRPCAddress {
+		t.Fatalf("Expected default grpc address, got: %s", address)
+	}
+}
+
+func TestGetGRPCAddress_returnsDefaultAddress_whenConfigFilesAreMissing(t *testing.T) {
+	// Given
+	withConfigPath(t, []string{"/path/to/missing-containerd-config.toml"})
+
+	// When
+	address, err := GetGRPCAddress()
+
+	// Then
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+	if address != defaultGRPCAddress {
+		t.Fatalf("Expected default grpc address, got: %s", address)
+	}
+}
+
+func TestGetProxyPluginCapabilities_returnsConfiguredCapabilities(t *testing.T) {
+	// Given
+	configPath := writeContainerdConfig(t, `
+version = 3
+
+[proxy_plugins."sysbox"]
+  type = "snapshot"
+  address = "/run/sysbox-snapshotter.sock"
+  capabilities = ["remap-ids", "walk-diff"]
+`)
+	withConfigPath(t, []string{configPath})
+
+	// When
+	capabilities, err := GetProxyPluginCapabilities("sysbox")
+
+	// Then
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+	if len(capabilities) != 2 || capabilities[0] != "remap-ids" || capabilities[1] != "walk-diff" {
+		t.Fatalf("Expected configured capabilities, got: %#v", capabilities)
+	}
+}
+
+func TestGetProxyPluginCapabilities_returnsEmpty_whenCapabilitiesAreOmitted(t *testing.T) {
+	// Given
+	configPath := writeContainerdConfig(t, `
+version = 3
+
+[proxy_plugins."sysbox"]
+  type = "snapshot"
+  address = "/run/sysbox-snapshotter.sock"
+`)
+	withConfigPath(t, []string{configPath})
+
+	// When
+	capabilities, err := GetProxyPluginCapabilities("sysbox")
+
+	// Then
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+	if len(capabilities) != 0 {
+		t.Fatalf("Expected no capabilities, got: %#v", capabilities)
+	}
+}
+
+func TestGetProxyPluginCapabilities_returnsEmpty_whenPluginIsMissing(t *testing.T) {
+	// Given
+	configPath := writeContainerdConfig(t, `
+version = 3
+
+[proxy_plugins."other"]
+  type = "snapshot"
+  address = "/run/other.sock"
+  capabilities = ["remap-ids"]
+`)
+	withConfigPath(t, []string{configPath})
+
+	// When
+	capabilities, err := GetProxyPluginCapabilities("sysbox")
+
+	// Then
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+	if len(capabilities) != 0 {
+		t.Fatalf("Expected no capabilities, got: %#v", capabilities)
+	}
+}
+
+func TestGetProxyPluginCapabilities_returnsEmpty_whenConfigFilesAreMissing(t *testing.T) {
+	// Given
+	withConfigPath(t, []string{"/path/to/missing-containerd-config.toml"})
+
+	// When
+	capabilities, err := GetProxyPluginCapabilities("sysbox")
+
+	// Then
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+	if len(capabilities) != 0 {
+		t.Fatalf("Expected no capabilities, got: %#v", capabilities)
+	}
+}
+
+func withConfigPath(t *testing.T, paths []string) {
+	t.Helper()
+	original := configPath
+	configPath = paths
+	t.Cleanup(func() { configPath = original })
+}
+
 func writeContainerdConfig(t *testing.T, configContent string) string {
 	t.Helper()
 	tmpFile, err := os.CreateTemp("", "config-*.toml")

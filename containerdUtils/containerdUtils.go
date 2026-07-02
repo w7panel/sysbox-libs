@@ -12,6 +12,7 @@ import (
 // (see https://github.com/containerd/containerd/blob/main/docs/man/containerd-config.toml.5.md)
 var (
 	configPath = []string{
+		"/var/lib/rancher/k3s/agent/etc/containerd/config.toml",
 		"/etc/containerd/containerd.toml",
 		"/etc/containerd/config.toml",
 		"/usr/local/etc/containerd/config.toml",
@@ -19,11 +20,18 @@ var (
 
 	defaultDataRoot     = "/var/lib/containerd"
 	defaultSandboxImage = "rancher/mirrored-pause:3.6"
+	defaultGRPCAddress  = "/run/containerd/containerd.sock"
 )
 
 type containerdConfig struct {
-	Root    string                            `toml:"Root"`
-	Plugins map[string]containerdPluginConfig `toml:"plugins"`
+	Root         string                                 `toml:"Root"`
+	GRPC         containerdGRPCConfig                   `toml:"grpc"`
+	Plugins      map[string]containerdPluginConfig      `toml:"plugins"`
+	ProxyPlugins map[string]containerdProxyPluginConfig `toml:"proxy_plugins"`
+}
+
+type containerdGRPCConfig struct {
+	Address string `toml:"address"`
 }
 
 type containerdPluginConfig struct {
@@ -31,6 +39,10 @@ type containerdPluginConfig struct {
 	Images       struct {
 		SandboxImage string `toml:"sandbox_image"`
 	} `toml:"images"`
+}
+
+type containerdProxyPluginConfig struct {
+	Capabilities []string `toml:"capabilities"`
 }
 
 // GetDataRoot returns the containerd data root directory, as read from
@@ -97,6 +109,59 @@ func parseSandboxImage(path string) (string, error) {
 		}
 	}
 	return defaultSandboxImage, nil
+}
+
+// GetGRPCAddress returns the containerd gRPC socket address.
+func GetGRPCAddress() (string, error) {
+	for _, path := range configPath {
+		address, err := parseGRPCAddress(path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return "", fmt.Errorf("failed to open file %s: %w", path, err)
+		}
+		return address, nil
+	}
+	return defaultGRPCAddress, nil
+}
+
+func parseGRPCAddress(path string) (string, error) {
+	var config containerdConfig
+	if err := parseConfig(path, &config); err != nil {
+		return "", err
+	}
+	if config.GRPC.Address == "" {
+		return defaultGRPCAddress, nil
+	}
+	return config.GRPC.Address, nil
+}
+
+// GetProxyPluginCapabilities returns the configured capabilities for a containerd proxy plugin.
+func GetProxyPluginCapabilities(pluginID string) ([]string, error) {
+	for _, path := range configPath {
+		capabilities, err := parseProxyPluginCapabilities(path, pluginID)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return nil, fmt.Errorf("failed to open file %s: %w", path, err)
+		}
+		return capabilities, nil
+	}
+	return nil, nil
+}
+
+func parseProxyPluginCapabilities(path string, pluginID string) ([]string, error) {
+	var config containerdConfig
+	if err := parseConfig(path, &config); err != nil {
+		return nil, err
+	}
+	plugin, ok := config.ProxyPlugins[pluginID]
+	if !ok {
+		return nil, nil
+	}
+	return plugin.Capabilities, nil
 }
 
 func parseConfig(path string, config *containerdConfig) error {
