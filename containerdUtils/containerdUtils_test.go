@@ -176,6 +176,28 @@ version = 3
 	}
 }
 
+func TestGetSandboxImageFromDir_returnsPinnedSandboxImage(t *testing.T) {
+	// Given
+	configDir := writeContainerdConfigDir(t, `
+version = 3
+
+[plugins]
+  [plugins."io.containerd.cri.v1.images".pinned_images]
+    sandbox = "registry.example/pinned-pause:3.10"
+`)
+
+	// When
+	image, err := GetSandboxImageFromDir(configDir)
+
+	// Then
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+	if image != "registry.example/pinned-pause:3.10" {
+		t.Fatalf("Expected sandbox image: %s, got: %s", "registry.example/pinned-pause:3.10", image)
+	}
+}
+
 func TestGetGRPCAddress_returnsConfiguredAddress(t *testing.T) {
 	// Given
 	configPath := writeContainerdConfig(t, `

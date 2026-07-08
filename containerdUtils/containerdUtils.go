@@ -40,6 +40,9 @@ type containerdPluginConfig struct {
 	Images       struct {
 		SandboxImage string `toml:"sandbox_image"`
 	} `toml:"images"`
+	PinnedImages struct {
+		Sandbox string `toml:"sandbox"`
+	} `toml:"pinned_images"`
 }
 
 type containerdProxyPluginConfig struct {
@@ -118,6 +121,9 @@ func parseSandboxImage(path string) (string, error) {
 		}
 		if plugin.Images.SandboxImage != "" {
 			return plugin.Images.SandboxImage, nil
+		}
+		if plugin.PinnedImages.Sandbox != "" {
+			return plugin.PinnedImages.Sandbox, nil
 		}
 	}
 	return defaultSandboxImage, nil
