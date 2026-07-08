@@ -154,6 +154,28 @@ version = 3
 	}
 }
 
+func TestGetSandboxImageFromDir_returnsConfiguredImage(t *testing.T) {
+	// Given
+	configDir := writeContainerdConfigDir(t, `
+version = 3
+
+[plugins]
+  [plugins."io.containerd.cri.v1.images"]
+    sandbox_image = "registry.example/k3s-pause:9.9"
+`)
+
+	// When
+	image, err := GetSandboxImageFromDir(configDir)
+
+	// Then
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+	if image != "registry.example/k3s-pause:9.9" {
+		t.Fatalf("Expected sandbox image: %s, got: %s", "registry.example/k3s-pause:9.9", image)
+	}
+}
+
 func TestGetGRPCAddress_returnsConfiguredAddress(t *testing.T) {
 	// Given
 	configPath := writeContainerdConfig(t, `
@@ -319,4 +341,17 @@ func writeContainerdConfig(t *testing.T, configContent string) string {
 		t.Fatalf("Failed to close temp file: %v", err)
 	}
 	return tmpFile.Name()
+}
+
+func writeContainerdConfigDir(t *testing.T, configContent string) string {
+	t.Helper()
+	tmpDir, err := os.MkdirTemp("", "containerd-config-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	t.Cleanup(func() { os.RemoveAll(tmpDir) })
+	if err = os.WriteFile(tmpDir+"/config.toml", []byte(configContent), 0600); err != nil {
+		t.Fatalf("Failed to write config.toml: %v", err)
+	}
+	return tmpDir
 }

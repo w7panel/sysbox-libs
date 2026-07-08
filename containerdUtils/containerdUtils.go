@@ -4,6 +4,7 @@ package containerdUtils
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/BurntSushi/toml"
 )
@@ -89,6 +90,17 @@ func GetSandboxImage() (string, error) {
 		return sandboxImage, nil
 	}
 	return defaultSandboxImage, nil
+}
+
+// GetSandboxImageFromDir returns the containerd sandbox image from config.toml
+// in the given directory, or containerd's default sandbox image when unset.
+func GetSandboxImageFromDir(configDir string) (string, error) {
+	path := filepath.Join(configDir, "config.toml")
+	sandboxImage, err := parseSandboxImage(path)
+	if err != nil {
+		return "", fmt.Errorf("failed to open file %s: %w", path, err)
+	}
+	return sandboxImage, nil
 }
 
 func parseSandboxImage(path string) (string, error) {
