@@ -12,8 +12,10 @@ require (
 )
 
 require (
+	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/spf13/afero v1.4.1 // indirect
 	golang.org/x/text v0.3.8 // indirect
+	gopkg.in/hlandau/service.v1 v1.0.7 // indirect
 )
 
 replace github.com/nestybox/sysbox-libs/linuxUtils => ../linuxUtils
